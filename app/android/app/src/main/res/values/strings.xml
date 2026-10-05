@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="tracking_title">Tracking your delivery</string>
+    <string name="tracking_waiting">Waiting for the next update…</string>
+    <string name="tracking_offline">Reconnecting to the delivery server…</string>
+    <string name="tracking_stop">Stop tracking</string>
+    <string name="channel_updates">Delivery updates</string>
+    <string name="channel_updates_desc">Takeoff, package delivered and drone returned alerts</string>
+    <string name="channel_tracking">Live delivery tracking</string>
+    <string name="channel_tracking_desc">Shown while a delivery is in progress</string>
+</resources>

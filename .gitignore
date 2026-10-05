@@ -1,0 +1,20 @@
+# Secrets / local config
+.env
+app/android/key.properties
+*.jks
+*.keystore
+
+# Python
+.venv/
+__pycache__/
+.pytest_cache/
+
+# Runtime data (SQLite databases, SMS outbox)
+backend/data/
+pc_bridge/data/
+
+# Flutter / Android build output
+app/build/
+app/.dart_tool/
+app/android/.gradle/
+app/android/local.properties

@@ -1,0 +1,4 @@
+# Flight logs are binary: never convert line endings
+*.tlog binary
+# Windows scripts keep CRLF
+*.cmd text eol=crlf

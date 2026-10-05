@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Status-bar icon: white drone silhouette (Android tints it). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="24" android:viewportHeight="24">
+    <path android:fillColor="#FFFFFFFF"
+        android:pathData="M1.5,5.2h6v1.6h-6z M16.5,5.2h6v1.6h-6z"/>
+    <path android:strokeColor="#FFFFFFFF" android:strokeWidth="1.8" android:strokeLineCap="round"
+        android:pathData="M4.5,7.2 L4.5,8.6 L9,11 M19.5,7.2 L19.5,8.6 L15,11"/>
+    <path android:fillColor="#FFFFFFFF"
+        android:pathData="M9.4,9.6h5.2a2,2 0,0 1,2 2v1.2a2,2 0,0 1,-2 2h-5.2a2,2 0,0 1,-2 -2v-1.2a2,2 0,0 1,2 -2z"/>
+    <path android:strokeColor="#FFFFFFFF" android:strokeWidth="1.4" android:strokeLineCap="round"
+        android:pathData="M10,14.8 L8.8,17 M14,14.8 L15.2,17"/>
+    <path android:fillColor="#FFFFFFFF"
+        android:pathData="M10.2,17.6h3.6v3.2h-3.6z"/>
+</vector>

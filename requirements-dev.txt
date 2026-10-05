@@ -1,0 +1,4 @@
+-r backend/requirements.txt
+-r pc_bridge/requirements.txt
+pytest>=8.0
+httpx>=0.27
