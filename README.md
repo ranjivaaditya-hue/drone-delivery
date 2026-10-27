@@ -1,5 +1,8 @@
 # Drone Delivery MVP: ArduPilot mission events → SMS + Android app
 
+> **Setting this up on another laptop?** Follow [MOVING_TO_A_NEW_LAPTOP.md](MOVING_TO_A_NEW_LAPTOP.md).
+> It has every step and all environment variables.
+
 A delivery **status and notification** system for an ArduPilot drone that flies a waypoint
 mission and drops a package with a servo. It does **not** control or track the drone:
 Mission Planner keeps doing all of that.
