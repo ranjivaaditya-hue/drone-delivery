@@ -37,7 +37,7 @@ if not exist .env (
 )
 
 echo [4/4] Running the self-test ...
-.venv\Scripts\python.exe -m pytest -q -p no:cacheprovider -W ignore::DeprecationWarning pc_bridge\tests backend\tests
+.venv\Scripts\python.exe -m pytest -q -p no:cacheprovider -p no:warnings pc_bridge\tests backend\tests
 if errorlevel 1 (
   echo Self-test FAILED - see the output above.
   exit /b 1
