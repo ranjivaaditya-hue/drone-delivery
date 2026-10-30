@@ -91,7 +91,7 @@ class MavlinkMonitor:
         if "," in conn_str and not conn_str.lower().startswith(("udp", "tcp")):
             conn_str, baud_text = conn_str.split(",", 1)      # "COM5,57600"
             baud = int(baud_text)
-        serial = not conn_str.lower().startswith(("udp", "tcp")) and not Path(conn_str).is_file()
+        serial = bool(re.match(r"(?i)^(com\d+|/dev/)", conn_str))   # COM5, /dev/ttyUSB0
         log.info("Opening MAVLink (listen-only): %s%s", conn_str, f" @ {baud} baud" if serial else "")
         log.info(self.p.describe())
         self.is_serial = serial
