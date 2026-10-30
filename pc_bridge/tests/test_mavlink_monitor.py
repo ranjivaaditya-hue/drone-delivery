@@ -41,6 +41,7 @@ class FakeCopter:
 
 
 def monitor(**overrides):
+    overrides.setdefault("depart_on_arm", False)   # these tests cover altitude-based takeoff detection
     s = Settings(**overrides)
     p = MissionProfile(takeoff_seq=1, delivery_wp_seq=3, release_seq=4, rtl_seq=5,
                        release_channel=9, release_pwm=1900, source="test")
@@ -145,3 +146,28 @@ def test_no_events_without_auto_mode():
     v, mon = FakeCopter(), monitor()
     events = run(mon, [v.hb(True, LOITER), v.servo9(1100), v.alt(5), v.servo9(1900), v.hb(False, LOITER)])
     assert events == []
+
+
+def test_depart_on_arm_fires_at_arming_in_any_mode():
+    v, mon = FakeCopter(), monitor(depart_on_arm=True)
+    events = run(mon, [v.hb(False, LOITER), v.hb(True, LOITER), v.hb(True, LOITER)])
+    assert names(events) == [E.TAKEOFF]
+    assert "armed" in events[0].evidence and "DEPART_ON_ARM" in events[0].evidence
+
+
+def test_depart_on_arm_then_normal_mission_continues():
+    v, mon = FakeCopter(), monitor(depart_on_arm=True)
+    events = run(mon, [
+        v.hb(True, LOITER), v.servo9(1100), v.hb(True, AUTO), v.seq(1), v.alt(4), v.seq(2), v.seq(3),
+        v.text("Mission: 4 SetServo"), v.seq(5), v.hb(False, AUTO),
+    ])
+    got = names(events)
+    assert got[:2] == [E.TAKEOFF, E.MISSION_STARTED]          # departed first, on arming
+    assert got.count(E.TAKEOFF) == 1                           # and only once
+    assert [e for e in got if e in (E.EN_ROUTE, E.PACKAGE_RELEASED, E.RTL_STARTED, E.HOME_COMPLETED)] == [
+        E.EN_ROUTE, E.PACKAGE_RELEASED, E.RTL_STARTED, E.HOME_COMPLETED]
+
+
+def test_depart_on_arm_off_waits_for_takeoff():
+    v, mon = FakeCopter(), monitor(depart_on_arm=False)
+    assert run(mon, [v.hb(True, LOITER), v.hb(True, LOITER)]) == []

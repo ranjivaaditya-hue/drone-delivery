@@ -116,7 +116,9 @@ API_HOST=0.0.0.0
 API_PORT=8000
 DB_PATH=backend/data/deliveries.db
 API_BASE_URL=http://127.0.0.1:8000
-MAVLINK_CONNECTION=udpin:0.0.0.0:14551
+MAVLINK_CONNECTION=COM5
+MAVLINK_BAUD=57600
+DEPART_ON_ARM=true
 TARGET_SYSTEM_ID=0
 MISSION_FILE=mission/delivery_mission.waypoints
 RELEASE_PWM_TOLERANCE=100
@@ -144,7 +146,9 @@ What each one means:
 | `API_PORT` | `8000` | Backend port | No |
 | `DB_PATH` | `backend/data/deliveries.db` | Delivery database (created automatically) | No |
 | `API_BASE_URL` | `http://127.0.0.1:8000` | Where the bridge finds the backend (same laptop) | No |
-| `MAVLINK_CONNECTION` | `udpin:0.0.0.0:14551` | Port where the bridge receives the drone telemetry copy | No |
+| `MAVLINK_CONNECTION` | `COM5` | Telemetry radio COM port. **Check yours in Device Manager → Ports.** Or `udpin:0.0.0.0:14551` for a Mission Planner copy | **Yes, set your COM port** |
+| `MAVLINK_BAUD` | `57600` | Radio baud rate (serial only) | If your radio differs |
+| `DEPART_ON_ARM` | `true` | Arming the drone = first notification (package picked up / departed). `false` = wait for real takeoff | Optional |
 | `TARGET_SYSTEM_ID` | `0` | 0 = use the first ArduPilot drone heard | No |
 | `MISSION_FILE` | `mission/delivery_mission.waypoints` | Mission layout (takeoff, delivery point, servo, RTL) | Yes, for the real mission (Step 10) |
 | `RELEASE_PWM_TOLERANCE` | `100` | ± microseconds around the release servo PWM | No |
@@ -248,10 +252,7 @@ Check the phone after each one. Each command prints the next one to run. Running
 ## Step 10: The real drone
 
 1. Connect Mission Planner to the drone as usual (ELRS link).
-2. In Mission Planner press **Ctrl+F** and click **MAVLink**. Choose **UDP Client**, enter
-   **127.0.0.1** and port **14551**, leave **Write access unticked**, and connect. This gives the
-   bridge a read-only copy of the telemetry. Mission Planner keeps working normally. Turn it on
-   again after every Mission Planner restart.
+2. Plug in the telemetry radio, find its COM port (Device Manager → Ports), and set `MAVLINK_CONNECTION=COM<number>` in `.env`. Windows lets only one program use a COM port, so **disconnect Mission Planner from that port** while the bridge runs. (To keep Mission Planner connected, use its Ctrl+F → MAVLink forwarding to UDP `127.0.0.1:14551` and set `MAVLINK_CONNECTION=udpin:0.0.0.0:14551`.)
 3. Start the system in live mode instead of the demo:
    ```bat
    tools\start_live.cmd

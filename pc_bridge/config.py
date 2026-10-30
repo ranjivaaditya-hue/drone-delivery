@@ -120,7 +120,9 @@ def _env_bool(name: str, default: bool) -> bool:
 
 @dataclass
 class Settings:
-    mavlink_connection: str = "udpin:0.0.0.0:14551"
+    mavlink_connection: str = "udpin:0.0.0.0:14551"   # or a COM port, e.g. "COM5" (telemetry radio)
+    mavlink_baud: int = 57600                          # serial only: must match the radio / SERIALx_BAUD
+    depart_on_arm: bool = True                         # arming the drone = package picked up / departed
     target_system_id: int = 0                  # 0 = lock onto the first ArduPilot autopilot heard
     takeoff_alt_m: float = 1.5                 # relative altitude that counts as airborne
     release_pwm_tolerance: int = 100
@@ -149,6 +151,8 @@ def load_settings(env_file: Path | None = None) -> Settings:
         takeoff_alt_m=float(os.getenv("TAKEOFF_ALT_M", "1.5")),
         release_pwm_tolerance=_env_int("RELEASE_PWM_TOLERANCE", 100),
         release_seq_fallback=_env_bool("RELEASE_SEQ_FALLBACK", True),
+        mavlink_baud=_env_int("MAVLINK_BAUD", 57600),
+        depart_on_arm=_env_bool("DEPART_ON_ARM", True),
         api_base_url=os.getenv("API_BASE_URL", Settings.api_base_url).rstrip("/"),
         drone_id=os.getenv("DRONE_ID", "DRONE-001"),
         warehouse_phone=os.getenv("WAREHOUSE_PHONE", ""),

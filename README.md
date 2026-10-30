@@ -177,6 +177,19 @@ uses it automatically.
 
 ## 5. Real drone: MAVLink/UDP configuration on the PC
 
+### 5.0 Telemetry radio on a USB serial port (COM port)
+
+Set in `.env`: `MAVLINK_CONNECTION=COM5` and `MAVLINK_BAUD=57600` (use your port from Device Manager →
+Ports, and the radio's baud rate). The bridge opens the port **listen-only**. Windows lets only one program
+open a COM port, so either disconnect Mission Planner from that port while the bridge runs, or keep
+Mission Planner on the port and use the forwarding in 5.1 (`MAVLINK_CONNECTION=udpin:0.0.0.0:14551`).
+If the radio is unplugged the bridge keeps retrying every 3 s. With no ground station connected,
+ArduPilot only sends the streams set in `SRx_*` parameters, so set `SRx_EXT_STAT`, `SRx_POSITION` and
+`SRx_RC_CHAN` to at least 2 for the port the radio uses (HEARTBEAT, and so the arming notification, always works).
+
+**`DEPART_ON_ARM=true` (temporary mode):** arming the drone counts as "package picked up / departed". The app
+and the SMS show the first step immediately, in any flight mode. Set it to `false` to wait for the real takeoff.
+
 ### 5.1 Give the bridge a read-only copy of the stream
 
 Mission Planner stays connected exactly as today. The bridge must **not** open the same COM

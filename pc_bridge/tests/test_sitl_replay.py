@@ -25,7 +25,7 @@ ALL = [S.DEPARTED, S.DELIVERING, S.PACKAGE_DELIVERED, S.RETURNING_HOME, S.COMPLE
 
 
 def replay(drop_types=(), loss=0.0, seed=0, fallback=True, tlog=TLOG):
-    mon = MavlinkMonitor(Settings(release_seq_fallback=fallback),
+    mon = MavlinkMonitor(Settings(release_seq_fallback=fallback, depart_on_arm=False),
                          MissionProfile(takeoff_seq=1, delivery_wp_seq=3, release_seq=4, rtl_seq=5,
                                         release_channel=9, release_pwm=1900, source="test"))
     machine = MissionStateMachine()

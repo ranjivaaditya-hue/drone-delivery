@@ -26,6 +26,7 @@ import logging
 import os
 import re
 import time
+from pathlib import Path
 from collections import Counter, deque
 from dataclasses import dataclass, field
 
@@ -71,6 +72,7 @@ class MavlinkMonitor:
         self.s, self.p = settings, profile
         self.conn = None
         self.is_log = False
+        self.is_serial = False
         self.eof = False
         self.target_sysid: int | None = settings.target_system_id or None
         self.armed: bool | None = None
@@ -85,11 +87,43 @@ class MavlinkMonitor:
 
     # ------------------------------------------------------------ connection
     def open(self) -> None:
-        conn_str = self.s.mavlink_connection
-        log.info("Opening MAVLink (listen-only): %s", conn_str)
+        conn_str, baud = self.s.mavlink_connection, self.s.mavlink_baud
+        if "," in conn_str and not conn_str.lower().startswith(("udp", "tcp")):
+            conn_str, baud_text = conn_str.split(",", 1)      # "COM5,57600"
+            baud = int(baud_text)
+        serial = not conn_str.lower().startswith(("udp", "tcp")) and not Path(conn_str).is_file()
+        log.info("Opening MAVLink (listen-only): %s%s", conn_str, f" @ {baud} baud" if serial else "")
         log.info(self.p.describe())
-        self.conn = mavutil.mavlink_connection(conn_str, robust_parsing=True)
+        self.is_serial = serial
+        self._conn_args = (conn_str, baud)
+        try:
+            self.conn = mavutil.mavlink_connection(conn_str, baud=baud, robust_parsing=True)
+        except Exception as exc:
+            if not serial:
+                raise
+            self.conn = None
+            self._reconnect(f"could not open {conn_str}: {exc}")
         self.is_log = isinstance(self.conn, mavutil.mavlogfile)
+
+    def _reconnect(self, why: str) -> None:
+        """Serial radio unplugged, or the port is taken. Retry every 3 s until it is back."""
+        log.warning("MAVLink port lost (%s). Retrying every 3 s - is the radio plugged in and Mission Planner "
+                    "disconnected from that COM port?", why)
+        try:
+            if self.conn is not None:
+                self.conn.close()
+        except Exception:
+            pass
+        self.last_heartbeat_wall = None
+        while True:
+            time.sleep(3)
+            try:
+                self.conn = mavutil.mavlink_connection(self._conn_args[0], baud=self._conn_args[1],
+                                                       robust_parsing=True)
+                log.info("MAVLink port %s is back", self._conn_args[0])
+                return
+            except Exception as exc:
+                log.debug("still unavailable: %s", exc)
 
     def close(self) -> None:
         if self.conn is not None:
@@ -117,7 +151,13 @@ class MavlinkMonitor:
                 remaining = deadline - time.monotonic()
                 if remaining <= 0:
                     break
-                msg = self.conn.recv_match(blocking=True, timeout=remaining)
+                try:
+                    msg = self.conn.recv_match(blocking=True, timeout=remaining)
+                except Exception as exc:  # pyserial raises SerialException / OSError when the radio goes away
+                    if not self.is_serial:
+                        raise
+                    self._reconnect(exc.__class__.__name__)
+                    break
                 if msg is None:
                     break
             self.handle_message(msg)
@@ -216,6 +256,11 @@ class MavlinkMonitor:
             return
         if mode != prev_mode and prev_mode is not None:
             log.info("Flight mode %s -> %s", prev_mode, mode)
+
+        if self.s.depart_on_arm and self.flight is not None:
+            # TEMPORARY MODE: arming the drone counts as "package picked up / departed"
+            # (customer + warehouse get the DEPARTED notification right away).
+            self._emit(MissionEvent.TAKEOFF, f"HEARTBEAT: drone armed (mode {mode}) - DEPART_ON_ARM", t)
 
         if mode == "AUTO":
             self._emit(MissionEvent.MISSION_STARTED, "HEARTBEAT: armed, flight mode AUTO", t)

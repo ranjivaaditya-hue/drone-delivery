@@ -1,5 +1,6 @@
 pymavlink>=2.4.41
 requests>=2.32
+pyserial>=3.5
 python-dotenv>=1.0
 # Only needed when SMS_PROVIDER=twilio:
 twilio>=9.0
