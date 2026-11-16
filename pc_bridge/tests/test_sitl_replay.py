@@ -113,3 +113,39 @@ def test_servo_left_open_from_last_drop_does_not_fake_a_release():
 def test_servo_left_open_with_packet_loss(seed):
     tr, _ = replay(tlog=TLOG_SERVO_OPEN, loss=0.30, seed=seed)
     assert [t.to_state for t in tr] == ALL
+
+
+def replay_auto(drop_types=(), loss=0.0, seed=0, tlog=TLOG):
+    """Same real flights, but with NO mission file: the bridge learns the layout from the drone."""
+    mon = MavlinkMonitor(Settings(depart_on_arm=False),
+                         MissionProfile(takeoff_seq=1, delivery_wp_seq=None, release_seq=None, rtl_seq=None,
+                                        release_channel=9, release_pwm=1900, source="auto"))
+    machine = MissionStateMachine()
+    machine.bind("DEL-A", S.READY, 0.0)
+    rng = random.Random(seed)
+    log = mavutil.mavlink_connection(str(tlog))
+    transitions = []
+    while True:
+        msg = log.recv_msg()
+        if msg is None:
+            break
+        if msg.get_type() in drop_types or rng.random() < loss:
+            continue
+        mon.handle_message(msg)
+        while mon._queue:
+            transitions += [o for o in machine.handle(mon._queue.popleft()) if isinstance(o, StateTransition)]
+    return transitions, mon
+
+
+@pytest.mark.parametrize("drop", [(), ("STATUSTEXT",), ("STATUSTEXT", "MISSION_ITEM_REACHED"),
+                                  ("STATUSTEXT", "MISSION_ITEM_REACHED", "SERVO_OUTPUT_RAW")])
+def test_no_mission_file_real_flight(drop):
+    tr, mon = replay_auto(drop_types=set(drop))
+    assert [t.to_state for t in tr] == ALL
+    assert (mon.p.release_seq, mon.p.delivery_wp_seq) == (4, 3)   # learned, not configured
+
+
+@pytest.mark.parametrize("seed", range(10))
+def test_no_mission_file_with_packet_loss(seed):
+    tr, _ = replay_auto(loss=0.30, seed=seed)
+    assert [t.to_state for t in tr] == ALL

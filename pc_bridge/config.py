@@ -49,9 +49,12 @@ class MissionProfile:
     def describe(self) -> str:
         servo = (f"SERVO{self.release_channel} = {self.release_pwm} us"
                  if self.release_channel and self.release_pwm else "not configured (PWM evidence disabled)")
-        return (f"mission profile from {self.source}: takeoff=#{self.takeoff_seq}, "
-                f"delivery waypoint=#{self.delivery_wp_seq}, release={self.release_command} #{self.release_seq}, "
-                f"rtl=#{self.rtl_seq}, release servo {servo}")
+
+        def n(v):
+            return f"#{v}" if v is not None else "learned in flight"
+        return (f"mission profile from {self.source}: takeoff={n(self.takeoff_seq)}, "
+                f"delivery waypoint={n(self.delivery_wp_seq)}, release={self.release_command} {n(self.release_seq)}, "
+                f"rtl={n(self.rtl_seq)}, release servo {servo}")
 
 
 def parse_waypoints_file(path: Path) -> list[tuple[int, int, list[float]]]:
@@ -183,7 +186,11 @@ def load_mission_profile() -> MissionProfile:
         if p.release_seq is None:
             log.warning("No DO_SET_SERVO/DO_GRIPPER release command found after the takeoff in %s", path)
     else:
-        p = MissionProfile()
+        # No mission file: the layout is learned from the drone during each flight
+        # ("Mission: N SetServo" / "Mission: N RTL" texts, or the mission counter skipping
+        # over the servo item). Only the takeoff item is assumed to be #1.
+        p = MissionProfile(takeoff_seq=1, delivery_wp_seq=None, release_seq=None, rtl_seq=None,
+                           source="the drone itself (no MISSION_FILE: layout learned in flight)")
     # Explicit env vars always win over the mission file.
     p.takeoff_seq = _env_int("TAKEOFF_SEQ", p.takeoff_seq)
     p.delivery_wp_seq = _env_int("DELIVERY_WP_SEQ", p.delivery_wp_seq)

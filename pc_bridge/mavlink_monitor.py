@@ -22,6 +22,7 @@ against the ArduPilot source (Copter 4.3-4.7) and against SITL; see README secti
 
 from __future__ import annotations
 
+import copy
 import logging
 import os
 import re
@@ -70,6 +71,7 @@ class Flight:
 class MavlinkMonitor:
     def __init__(self, settings: Settings, profile: MissionProfile):
         self.s, self.p = settings, profile
+        self.base_profile = copy.deepcopy(profile)  # what is learned in flight is reset at every arm
         self.conn = None
         self.is_log = False
         self.is_serial = False
@@ -245,6 +247,7 @@ class MavlinkMonitor:
 
         if armed and not was_armed:
             self.flight = Flight(started=t)
+            self.p = copy.deepcopy(self.base_profile)  # the delivery point/layout can differ every flight
             log.info("Vehicle ARMED (mode %s)", mode)
         elif was_armed and not armed:
             log.info("Vehicle DISARMED (mode %s)", mode)
@@ -284,6 +287,16 @@ class MavlinkMonitor:
             f.seen_seq_le_takeoff = True
         if p.delivery_wp_seq is not None and seq <= p.delivery_wp_seq:
             f.seen_seq_le_delivery = True
+
+        # Layout learned in flight: MISSION_CURRENT only shows NAV items, so a jump such as 2 -> 4
+        # means item 3 was a DO command, run as item 2 completed. In a delivery mission that is the
+        # servo release, so item 2 is the delivery waypoint.
+        if (p.release_seq is None and self.base_profile.release_seq is None and prev is not None
+                and prev > tko and seq > prev + 1 and self._airborne()):
+            p.release_seq, p.delivery_wp_seq = prev + 1, prev
+            f.seen_seq_le_delivery = True
+            log.info("Learned from the drone: mission skipped item #%d (a DO command), so the release is #%d "
+                     "and the delivery waypoint #%d", prev + 1, prev + 1, prev)
 
         if seq > tko:
             if f.seen_seq_le_takeoff:
@@ -341,6 +354,7 @@ class MavlinkMonitor:
         m = RE_MISSION_ITEM.match(text)
         if m:
             seq, kind = int(m.group(1)), m.group(2)
+            self._learn_from_text(seq, kind)
             # With a known release seq the match is exact. Without one, require airborne, so a
             # "close the latch" servo command before takeoff is not mistaken for the drop.
             if kind == p.release_command and (seq == p.release_seq if p.release_seq is not None else self._airborne()):
@@ -355,6 +369,18 @@ class MavlinkMonitor:
         m = RE_REACHED.match(text)
         if m and p.delivery_wp_seq is not None and int(m.group(1)) == p.delivery_wp_seq:
             self._emit(MissionEvent.DELIVERY_WAYPOINT_REACHED, f"STATUSTEXT '{text}' (delivery waypoint)", t)
+
+    def _learn_from_text(self, seq: int, kind: str) -> None:
+        """Fill in unknown parts of the mission layout from ArduPilot's 'Mission: N <type>' texts."""
+        p = self.p
+        if kind == "Takeoff" and self.base_profile.takeoff_seq is None:
+            p.takeoff_seq = seq
+        elif kind == p.release_command and p.release_seq is None and self._airborne():
+            p.release_seq, p.delivery_wp_seq = seq, seq - 1
+            log.info("Learned from the drone: release command is item #%d, delivery waypoint #%d", seq, seq - 1)
+        elif kind == "RTL" and p.rtl_seq is None:
+            p.rtl_seq = seq
+            log.info("Learned from the drone: return-to-launch is item #%d", seq)
 
     def _on_servo_output(self, msg, t: float) -> None:
         ch, target = self.p.release_channel, self.p.release_pwm

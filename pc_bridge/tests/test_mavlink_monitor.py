@@ -171,3 +171,52 @@ def test_depart_on_arm_then_normal_mission_continues():
 def test_depart_on_arm_off_waits_for_takeoff():
     v, mon = FakeCopter(), monitor(depart_on_arm=False)
     assert run(mon, [v.hb(True, LOITER), v.hb(True, LOITER)]) == []
+
+
+# ---------------- no mission file: layout learned in flight ----------------
+# Layout used here: 1 TAKEOFF, 2 WAYPOINT (delivery point, new every flight), 3 DO_SET_SERVO, 4 RTL
+
+def auto_monitor(**overrides):
+    overrides.setdefault("depart_on_arm", False)
+    return MavlinkMonitor(Settings(**overrides),
+                          MissionProfile(takeoff_seq=1, delivery_wp_seq=None, release_seq=None, rtl_seq=None,
+                                         release_channel=9, release_pwm=1900, source="auto"))
+
+
+def test_auto_layout_learned_from_mission_texts():
+    v, mon = FakeCopter(), auto_monitor()
+    events = run(mon, [
+        v.hb(True, AUTO), v.servo9(1100), v.seq(1), v.alt(4), v.reached(1), v.seq(2),
+        v.reached(2), v.text("Reached command #2"),
+        v.text("Mission: 3 SetServo"), v.text("Mission: 4 RTL"), v.servo9(1900), v.seq(4),
+        v.reached(4), v.hb(False, AUTO),
+    ])
+    assert names(events) == [E.MISSION_STARTED, E.TAKEOFF, E.EN_ROUTE, E.PACKAGE_RELEASED, E.RTL_STARTED,
+                             E.DELIVERY_WAYPOINT_REACHED, E.HOME_COMPLETED]
+    assert (mon.p.release_seq, mon.p.delivery_wp_seq, mon.p.rtl_seq) == (3, 2, 4)
+
+
+def test_auto_layout_learned_from_mission_counter_when_texts_lost():
+    v, mon = FakeCopter(), auto_monitor()
+    msgs = [v.hb(True, AUTO), v.seq(1), v.alt(4), v.seq(2), v.seq(2), v.seq(4)]  # 2 -> 4: item 3 was the servo
+    msgs += [v.seq(4, dt=1.0) for _ in range(4)] + [v.hb(False, AUTO)]
+    events = run(mon, msgs)
+    got = names(events)
+    assert E.PACKAGE_RELEASED in got and E.RTL_STARTED in got and got[-1] is E.HOME_COMPLETED
+    assert (mon.p.release_seq, mon.p.delivery_wp_seq) == (3, 2)
+
+
+def test_auto_layout_is_relearned_every_flight():
+    v, mon = FakeCopter(), auto_monitor()
+    run(mon, [v.hb(True, AUTO), v.seq(1), v.alt(4), v.seq(2), v.text("Mission: 3 SetServo"), v.hb(False, AUTO)])
+    assert mon.p.release_seq == 3
+    run(mon, [v.hb(True, AUTO)])  # next flight: nothing assumed from the previous one
+    assert mon.p.release_seq is None and mon.p.rtl_seq is None
+
+
+def test_auto_no_release_without_evidence():
+    """Reaching the waypoint and hovering, with no servo item run, is never 'delivered'."""
+    v, mon = FakeCopter(), auto_monitor()
+    events = run(mon, [v.hb(True, AUTO), v.seq(1), v.alt(4), v.seq(2), v.reached(2)] +
+                 [v.seq(2, dt=1.0) for _ in range(5)])
+    assert E.PACKAGE_RELEASED not in names(events)
